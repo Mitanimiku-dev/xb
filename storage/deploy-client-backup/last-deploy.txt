@@ -1,6 +1,0 @@
-deploy time : 2026-09-25 16:52:11 +0800
-client ver  : 1.2.2
-zip         : KanataIM-v1.2.2.zip
-zip md5     : 98c8adb00ff9c31d47ac71fee70c95fe
-zip size    : 40128606
-replaced    : 1.2.1

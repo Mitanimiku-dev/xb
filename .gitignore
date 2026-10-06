@@ -32,3 +32,13 @@ compose.yaml
 compose.host.yaml
 compose.split.yaml
 .scribe
+
+# Local runtime data and deployment backups
+/.zcode/
+/core
+/core.*
+/supervisord.pid
+/public/downloads/
+/storage/app/private/
+/storage/deploy-client-backup/
+/storage/theme-assets-backup-*.tgz
