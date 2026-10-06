@@ -41,6 +41,9 @@ class PaymentService
 
         $this->config = [];
         if (isset($payment)) {
+            if ($payment['payment'] !== $method) {
+                throw new ApiException('payment method mismatch');
+            }
             $this->config = is_string($payment['config']) ? json_decode($payment['config'], true) : $payment['config'];
             $this->config['enable'] = $payment['enable'];
             $this->config['id'] = $payment['id'];
@@ -68,7 +71,13 @@ class PaymentService
     {
         if (!$this->config['enable'])
             throw new ApiException('gate is not enable');
-        return $this->payment->notify($params);
+        $verified = $this->payment->notify($params);
+        if (!is_array($verified) || empty($verified['trade_no']) || empty($verified['callback_no'])) {
+            return false;
+        }
+        // Bind the callback to the configured gateway, never a client-supplied ID.
+        $verified['payment_id'] = (int) $this->config['id'];
+        return $verified;
     }
 
     public function pay($order)

@@ -669,6 +669,10 @@ class UserController extends Controller
             $user->orders()->delete();
             $user->codes()->delete();
             $user->stat()->delete();
+            $ticketIds = $user->tickets()->pluck('id');
+            if ($ticketIds->isNotEmpty()) {
+                \App\Models\TicketMessage::whereIn('ticket_id', $ticketIds)->delete();
+            }
             $user->tickets()->delete();
             $user->delete();
             DB::commit();

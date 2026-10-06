@@ -22,11 +22,11 @@ class TicketController extends Controller
         if ($request->input('id')) {
             $ticket = Ticket::where('id', $request->input('id'))
                 ->where('user_id', $request->user()->id)
-                ->first()
-                ->load('message');
+                ->first();
             if (!$ticket) {
                 return $this->fail([400, __('Ticket does not exist')]);
             }
+            $ticket->load('message');
             $ticket['message'] = TicketMessage::where('ticket_id', $ticket->id)->get();
             $ticket['message']->each(function ($message) use ($ticket) {
                 $message['is_me'] = ($message['user_id'] == $ticket->user_id);
@@ -70,7 +70,8 @@ class TicketController extends Controller
         if ($ticket->status) {
             return $this->fail([400, __('The ticket is closed and cannot be replied')]);
         }
-        if ((int) admin_setting('ticket_must_wait_reply', 0) && $request->user()->id == $this->getLastMessage($ticket->id)->user_id) {
+        $lastMessage = $this->getLastMessage($ticket->id);
+        if ((int) admin_setting('ticket_must_wait_reply', 0) && $lastMessage && $request->user()->id == $lastMessage->user_id) {
             return $this->fail(codeResponse: [400, __('Please wait for the technical enginneer to reply')]);
         }
         $ticketService = new TicketService();

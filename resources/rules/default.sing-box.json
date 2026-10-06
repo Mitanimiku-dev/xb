@@ -2,6 +2,14 @@
     "dns": {
         "rules": [
             {
+                "domain": [
+                    "srt1-cdn-tos.kanata.im",
+                    "srt2-cdn-tos.kanata.im",
+                    "srt3-cdn-tos.kanata.im"
+                ],
+                "server": "local"
+            },
+            {
                 "outbound": ["any"],
                 "server": "local"
             },
@@ -25,9 +33,19 @@
                 "tag": "remote"
             },
             {
-                "address": "https://223.5.5.5/dns-query",
+                "address": "https://8.8.8.8/dns-query",
+                "detour": "节点选择",
+                "tag": "remote-backup"
+            },
+            {
+                "address": "223.5.5.5",
                 "detour": "direct",
                 "tag": "local"
+            },
+            {
+                "address": "119.29.29.29",
+                "detour": "direct",
+                "tag": "local-backup"
             },
             {
                 "address": "rcode://success",

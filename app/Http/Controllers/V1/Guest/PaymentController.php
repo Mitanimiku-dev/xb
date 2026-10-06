@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\Plugin\HookManager;
 
@@ -23,7 +24,7 @@ class PaymentController extends Controller
                 return $this->fail([422, 'verify error']);
             }
             HookManager::call('payment.notify.verified', $verify);
-            if (!$this->handle($verify['trade_no'], $verify['callback_no'])) {
+            if (!$this->handle($verify)) {
                 return $this->fail([400, 'handle error']);
             }
             return (isset($verify['custom_result']) ? $verify['custom_result'] : 'success');
@@ -33,20 +34,36 @@ class PaymentController extends Controller
         }
     }
 
-    private function handle($tradeNo, $callbackNo)
+    private function handle(array $verify): bool
     {
-        $order = Order::where('trade_no', $tradeNo)->first();
-        if (!$order) {
-            return $this->fail([400202, 'order is not found']);
-        }
-        if ($order->status !== Order::STATUS_PENDING)
+        $paidOrder = null;
+        $handled = DB::transaction(function () use ($verify, &$paidOrder) {
+            $order = Order::where('trade_no', $verify['trade_no'])->lockForUpdate()->first();
+            if (!$order || (int) $order->payment_id !== $verify['payment_id']) {
+                return false;
+            }
+            if (array_key_exists('total_amount', $verify) &&
+                $verify['total_amount'] !== (int) $order->total_amount + (int) $order->handling_amount) {
+                return false;
+            }
+            if ($order->status !== Order::STATUS_PENDING) {
+                return in_array($order->status, [
+                    Order::STATUS_PROCESSING,
+                    Order::STATUS_COMPLETED,
+                    Order::STATUS_DISCOUNTED,
+                ], true) && (string) $order->callback_no === (string) $verify['callback_no'];
+            }
+            $orderService = new OrderService($order);
+            if (!$orderService->paid($verify['callback_no'])) {
+                throw new \RuntimeException('Failed to process verified payment');
+            }
+            $paidOrder = $order;
             return true;
-        $orderService = new OrderService($order);
-        if (!$orderService->paid($callbackNo)) {
-            return false;
-        }
+        });
 
-        HookManager::call('payment.notify.success', $order);
-        return true;
+        if ($paidOrder) {
+            HookManager::call('payment.notify.success', $paidOrder);
+        }
+        return $handled;
     }
 }

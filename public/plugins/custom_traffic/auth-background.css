@@ -1,0 +1,28 @@
+.ct-auth-layout {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+}
+
+.ct-auth-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* The existing login background now lives outside the page transition. */
+.ct-auth-layout [data-ct-auth-page] > .min-h-screen {
+  background: transparent !important;
+}
+
+.ct-auth-layout [data-ct-auth-page] > .min-h-screen > .absolute.inset-0 {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ct-auth-background > div {
+    animation: none !important;
+  }
+}

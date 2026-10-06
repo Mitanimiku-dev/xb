@@ -52,8 +52,8 @@ class TicketController extends Controller
     {
         $ticket = Ticket::with('messages', 'user')->find($request->input('id'));
 
-        if (!$ticket) {
-            return $this->fail([400202, '工单不存在']);
+        if (!$ticket || !$ticket->user) {
+            return $this->fail([400202, '工单不存在或所属用户已删除']);
         }
         $ticket->messages->each(fn($msg) => $msg->setRelation('ticket', $ticket));
         $result = $ticket->toArray();
@@ -70,6 +70,7 @@ class TicketController extends Controller
     private function fetchTickets(Request $request)
     {
         $ticketModel = Ticket::with('user')
+            ->whereHas('user')
             ->when($request->has('status'), function ($query) use ($request) {
                 $query->where('status', $request->input('status'));
             })

@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\Order;
 use App\Services\PlanService;
+use App\Services\Plugin\HookManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,7 +20,7 @@ class OrderResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
+        $data = [
             ...parent::toArray($request),
             'period' => PlanService::getLegacyPeriod((string)$this->period),
             'plan' => $this->whenLoaded('plan', fn() => PlanResource::make($this->plan)),
@@ -30,5 +31,7 @@ class OrderResource extends JsonResource
                 'icon' => $this->payment->icon,
             ] : null),
         ];
+
+        return HookManager::filter('user.order.resource', $data, $request, $this->resource);
     }
 }

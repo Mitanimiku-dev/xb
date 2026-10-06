@@ -17,10 +17,57 @@ use Illuminate\Http\Request;
 class StatController extends Controller
 {
     private $service;
+
+    /**
+     * 统计月度重置日（每月26号）。
+     */
+    private const STAT_MONTH_RESET_DAY = 27;
+
     public function __construct(StatisticalService $service)
     {
         $this->service = $service;
     }
+
+    /**
+     * 根据月度重置日计算统计"月"的起始时间戳。
+     * 若当天日期 >= 重置日，月起始 = 当月重置日；
+     * 若当天日期 <  重置日，月起始 = 上月重置日。
+     *
+     * @param int $offset 偏移月数（0=本月, -1=上月, -2=前月）
+     */
+    private function getMonthStart(int $offset = 0): int
+    {
+        $now = getdate();
+        $day = $now['mday'];
+        $mon = $now['mon'];
+        $year = $now['year'];
+        $resetDay = self::STAT_MONTH_RESET_DAY;
+
+        if ($day >= $resetDay) {
+            $cycleMonth = $mon;
+            $cycleYear = $year;
+        } else {
+            $cycleMonth = $mon - 1;
+            $cycleYear = $year;
+            if ($cycleMonth < 1) {
+                $cycleMonth = 12;
+                $cycleYear--;
+            }
+        }
+
+        $cycleMonth += $offset;
+        while ($cycleMonth < 1) {
+            $cycleMonth += 12;
+            $cycleYear--;
+        }
+        while ($cycleMonth > 12) {
+            $cycleMonth -= 12;
+            $cycleYear++;
+        }
+
+        return mktime(0, 0, 0, $cycleMonth, $resetDay, $cycleYear);
+    }
+
     public function getOverride(Request $request)
     {
         // 获取在线节点数
@@ -41,7 +88,7 @@ class StatController extends Controller
             ->first();
 
         // 获取本月流量统计
-        $monthStart = strtotime(date('Y-m-1'));
+        $monthStart = $this->getMonthStart();
         $monthTraffic = StatServer::where('record_at', '>=', $monthStart)
             ->where('record_at', '<', time())
             ->selectRaw('SUM(u) as upload, SUM(d) as download, SUM(u + d) as total')
@@ -53,11 +100,11 @@ class StatController extends Controller
 
         return [
             'data' => [
-                'month_income' => Order::where('created_at', '>=', strtotime(date('Y-m-1')))
+                'month_income' => Order::where('created_at', '>=', $this->getMonthStart())
                     ->where('created_at', '<', time())
                     ->whereNotIn('status', [0, 2])
                     ->sum('total_amount'),
-                'month_register_total' => User::where('created_at', '>=', strtotime(date('Y-m-1')))
+                'month_register_total' => User::where('created_at', '>=', $this->getMonthStart())
                     ->where('created_at', '<', time())
                     ->count(),
                 'ticket_pending_total' => Ticket::where('status', 0)
@@ -71,15 +118,15 @@ class StatController extends Controller
                     ->where('created_at', '<', time())
                     ->whereNotIn('status', [0, 2])
                     ->sum('total_amount'),
-                'last_month_income' => Order::where('created_at', '>=', strtotime('-1 month', strtotime(date('Y-m-1'))))
-                    ->where('created_at', '<', strtotime(date('Y-m-1')))
+                'last_month_income' => Order::where('created_at', '>=', $this->getMonthStart(-1))
+                    ->where('created_at', '<', $this->getMonthStart())
                     ->whereNotIn('status', [0, 2])
                     ->sum('total_amount'),
-                'commission_month_payout' => CommissionLog::where('created_at', '>=', strtotime(date('Y-m-1')))
+                'commission_month_payout' => CommissionLog::where('created_at', '>=', $this->getMonthStart())
                     ->where('created_at', '<', time())
                     ->sum('get_amount'),
-                'commission_last_month_payout' => CommissionLog::where('created_at', '>=', strtotime('-1 month', strtotime(date('Y-m-1'))))
-                    ->where('created_at', '<', strtotime(date('Y-m-1')))
+                'commission_last_month_payout' => CommissionLog::where('created_at', '>=', $this->getMonthStart(-1))
+                    ->where('created_at', '<', $this->getMonthStart())
                     ->sum('get_amount'),
                 // 新增统计数据
                 'online_nodes' => $onlineNodes,
@@ -257,9 +304,9 @@ class StatController extends Controller
      */
     public function getStats()
     {
-        $currentMonthStart = strtotime(date('Y-m-01'));
-        $lastMonthStart = strtotime('-1 month', $currentMonthStart);
-        $twoMonthsAgoStart = strtotime('-2 month', $currentMonthStart);
+        $currentMonthStart = $this->getMonthStart();
+        $lastMonthStart = $this->getMonthStart(-1);
+        $twoMonthsAgoStart = $this->getMonthStart(-2);
 
         // Today's start timestamp
         $todayStart = strtotime('today');
